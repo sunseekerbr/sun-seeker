@@ -32,7 +32,6 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-screen pb-24" style={{ background: '#0a0a0f' }}>
-      import('mapbox-gl/dist/mapbox-gl.css')
       <div className="sticky top-0 z-40 flex justify-between items-center px-4 py-3"
         style={{ background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1e1e2e' }}>
         <span className="text-xl font-extrabold tracking-tight logo-gradient">☀ SunSeeker</span>
