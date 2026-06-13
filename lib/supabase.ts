@@ -49,6 +49,7 @@ export type Location = {
   lng: number
   photo_count: number
   avg_rating: number
+  type?: string | null
 }
 
 export type HunterRanking = {
