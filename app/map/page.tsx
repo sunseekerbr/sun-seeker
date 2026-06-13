@@ -1,9 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase'
 import type { Location } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
+
+// Importação dinâmica sem SSR — obrigatório pro Leaflet funcionar no Next.js
+const MapLeaflet = dynamic(() => import('@/components/MapLeaflet'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center" style={{ background: '#0d1117' }}>
+      <div className="w-7 h-7 rounded-full border-2 animate-spin"
+        style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
+    </div>
+  ),
+})
 
 export default function MapPage() {
   const [locations, setLocations] = useState<Location[]>([])
@@ -27,6 +39,10 @@ export default function MapPage() {
 
   const filters = ['todos', 'praia', 'montanha', 'cidade', 'campo']
 
+  const filtered = filter === 'todos'
+    ? locations
+    : locations.filter(l => l.type?.toLowerCase() === filter)
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
       {/* Search bar */}
@@ -40,7 +56,6 @@ export default function MapPage() {
           <span className="text-sm" style={{ color: '#555' }}>Buscar locais de pôr do sol...</span>
         </div>
 
-        {/* Filtros */}
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
           {filters.map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -56,39 +71,16 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Mapa placeholder */}
-      <div className="relative flex items-center justify-center"
-        style={{ height: '38vh', background: '#0d1117', borderBottom: '1px solid #1e1e2e' }}>
-        {/* Grid decorativo */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'linear-gradient(rgba(255,140,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,140,0,0.05) 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
-        }} />
-        <div className="relative z-10 flex flex-col items-center gap-3 text-center px-6">
-          <div className="text-5xl">🗺️</div>
-          <p className="text-base font-bold text-white">Mapa interativo</p>
-          <p className="text-xs leading-relaxed" style={{ color: '#555' }}>
-            Configure o token do Mapbox no painel da Vercel{'\n'}em Environment Variables para ativar o mapa.
-          </p>
-        </div>
-
-        {/* Pins decorativos */}
-        {[
-          { top: '28%', left: '20%', rating: '9.8' },
-          { top: '45%', left: '55%', rating: '9.4' },
-          { top: '62%', left: '35%', rating: '9.1' },
-          { top: '30%', left: '72%', rating: '8.9' },
-        ].map((pin, i) => (
-          <div key={i} className="absolute flex flex-col items-center"
-            style={{ top: pin.top, left: pin.left, transform: 'translate(-50%,-100%)' }}>
-            <div className="px-2 py-1 rounded-full text-xs font-bold"
-              style={{ background: '#FF8C00', color: '#fff', boxShadow: '0 2px 8px rgba(255,140,0,0.4)' }}>
-              ★ {pin.rating}
-            </div>
-            <div className="w-0.5 h-2" style={{ background: '#FF8C00' }} />
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#FF8C00' }} />
+      {/* Mapa */}
+      <div className="relative" style={{ height: '42vh', zIndex: 10 }}>
+        {loading ? (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: '#0d1117' }}>
+            <div className="w-7 h-7 rounded-full border-2 animate-spin"
+              style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
           </div>
-        ))}
+        ) : (
+          <MapLeaflet locations={filtered} onSelect={setSelected} />
+        )}
       </div>
 
       {/* Card do local selecionado */}
@@ -97,19 +89,23 @@ export default function MapPage() {
           style={{ background: '#1a1a28', border: '1px solid #FF8C00' }}>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">{selected.name}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#888' }}>{selected.city}, {selected.state}</p>
+            <p className="text-xs mt-0.5" style={{ color: '#888' }}>
+              {selected.city}{selected.state ? `, ${selected.state}` : ''}
+            </p>
             <div className="flex gap-2 mt-2">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(255,140,0,0.15)', color: '#FF8C00' }}>
-                ★ {Number(selected.avg_rating).toFixed(1)}
-              </span>
+              {selected.avg_rating > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,140,0,0.15)', color: '#FF8C00' }}>
+                  ★ {Number(selected.avg_rating).toFixed(1)}
+                </span>
+              )}
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                 style={{ background: 'rgba(255,77,109,0.15)', color: '#FF4D6D' }}>
                 {selected.photo_count} fotos
               </span>
             </div>
           </div>
-          <button onClick={() => setSelected(null)} style={{ color: '#555' }}>✕</button>
+          <button onClick={() => setSelected(null)} style={{ color: '#555', fontSize: 18 }}>✕</button>
         </div>
       )}
 
@@ -119,14 +115,7 @@ export default function MapPage() {
           Melhores avaliados
         </p>
 
-        {loading && (
-          <div className="flex justify-center py-10">
-            <div className="w-7 h-7 rounded-full border-2 animate-spin"
-              style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
-          </div>
-        )}
-
-        {!loading && locations.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-12" style={{ color: '#555' }}>
             <div className="text-4xl mb-3">📍</div>
             <p className="text-sm">Nenhum local cadastrado ainda.</p>
@@ -134,7 +123,7 @@ export default function MapPage() {
           </div>
         )}
 
-        {locations.map((loc) => (
+        {filtered.map((loc) => (
           <div key={loc.id}
             onClick={() => setSelected(loc)}
             className="flex items-center gap-3 p-3 mb-2 rounded-2xl cursor-pointer transition-all active:scale-[0.98]"
@@ -149,9 +138,11 @@ export default function MapPage() {
                 {loc.city}{loc.state ? `, ${loc.state}` : ''}
               </p>
               <div className="flex gap-2 mt-1.5">
-                <span className="text-xs font-bold" style={{ color: '#FF8C00' }}>
-                  ★ {Number(loc.avg_rating).toFixed(1)}
-                </span>
+                {loc.avg_rating > 0 && (
+                  <span className="text-xs font-bold" style={{ color: '#FF8C00' }}>
+                    ★ {Number(loc.avg_rating).toFixed(1)}
+                  </span>
+                )}
                 <span className="text-xs" style={{ color: '#555' }}>
                   {loc.photo_count} fotos
                 </span>

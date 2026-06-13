@@ -14,6 +14,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -35,12 +37,25 @@ export default function ProfilePage() {
         .from('profiles').select('*').eq('username', username).single()
       if (!p) { setLoading(false); return }
       setProfile(p)
+      setFollowersCount(p.followers_count ?? 0)
 
       const { data: userPosts } = await supabase
         .from('posts').select('*')
         .eq('user_id', p.id)
         .order('created_at', { ascending: false })
       setPosts(userPosts ?? [])
+
+      // Checa se usuário logado já segue este perfil
+      if (user && user.id !== p.id) {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', p.id)
+          .maybeSingle()
+        setIsFollowing(!!followData)
+      }
+
       setLoading(false)
     }
     load()
@@ -49,6 +64,25 @@ export default function ProfilePage() {
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function handleFollow() {
+    if (!currentUser) { router.push(`/login?next=/profile/${username}`); return }
+    if (!profile) return
+
+    if (isFollowing) {
+      await supabase.from('follows')
+        .delete()
+        .eq('follower_id', currentUser)
+        .eq('following_id', profile.id)
+      setIsFollowing(false)
+      setFollowersCount(c => Math.max(0, c - 1))
+    } else {
+      await supabase.from('follows')
+        .insert({ follower_id: currentUser, following_id: profile.id })
+      setIsFollowing(true)
+      setFollowersCount(c => c + 1)
+    }
   }
 
   const isOwn = currentUser === profile?.id
@@ -123,7 +157,7 @@ export default function ProfilePage() {
       <div className="flex" style={{ borderTop: '1px solid #1e1e2e', borderBottom: '1px solid #1e1e2e' }}>
         {[
           { num: profile.sunset_count, label: 'Pôres do sol' },
-          { num: profile.followers_count, label: 'Seguidores' },
+          { num: followersCount, label: 'Seguidores' },
           { num: Number(profile.avg_rating).toFixed(1), label: 'Nota média' },
         ].map((s, i) => (
           <div key={i} className="flex-1 py-4 text-center"
@@ -142,8 +176,16 @@ export default function ProfilePage() {
           </Link>
         ) : (
           <>
-            <button className="btn-primary text-sm" style={{ padding: '10px' }}>Seguir</button>
-            <button className="btn-secondary text-sm" style={{ padding: '10px' }}>Mensagem</button>
+            <button
+              onClick={handleFollow}
+              className="text-sm font-bold flex-1 py-2.5 rounded-full transition-all"
+              style={{
+                background: isFollowing ? 'transparent' : 'linear-gradient(90deg, #FF8C00, #FF4D6D)',
+                border: isFollowing ? '1px solid #2a2a3a' : 'none',
+                color: isFollowing ? '#888' : 'white',
+              }}>
+              {isFollowing ? 'Seguindo ✓' : 'Seguir'}
+            </button>
           </>
         )}
       </div>
