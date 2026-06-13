@@ -82,7 +82,7 @@ export default function PostCard({ post, currentUserId }: Props) {
       </div>
 
       {/* Foto */}
-      <div className="relative w-full" style={{ aspectRatio: '4/3', background: '#1a1a2e' }}>
+      <Link href={`/post/${post.id}`} className="block relative w-full" style={{ aspectRatio: '4/3', background: '#1a1a2e' }}>
         <Image
           src={post.image_url}
           alt={post.caption ?? 'Pôr do sol'}
@@ -106,7 +106,7 @@ export default function PostCard({ post, currentUserId }: Props) {
             </span>
           )}
         </div>
-      </div>
+      </Link>
 
       {/* Ações */}
       <div className="flex items-center gap-4 px-4 pt-3 pb-2">
@@ -119,12 +119,13 @@ export default function PostCard({ post, currentUserId }: Props) {
           <span style={{ color: liked ? '#FF4D6D' : '#888' }}>{likesCount.toLocaleString('pt-BR')}</span>
         </button>
 
-        <button className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: '#888' }}>
+        <Link href={`/post/${post.id}`}
+          className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: '#888' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
           </svg>
           {post.comments_count}
-        </button>
+        </Link>
 
         <div className="flex-1" />
 

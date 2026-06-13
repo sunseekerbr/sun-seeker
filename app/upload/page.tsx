@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 
 export default function UploadPage() {
+  const [authChecked, setAuthChecked] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [caption, setCaption] = useState('')
@@ -19,6 +20,27 @@ export default function UploadPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login?next=/upload')
+      } else {
+        setAuthChecked(true)
+      }
+    }
+    checkAuth()
+  }, [])
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
+      </div>
+    )
+  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]

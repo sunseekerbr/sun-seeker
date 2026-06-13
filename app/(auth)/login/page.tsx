@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -10,8 +10,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [next, setNext] = useState('/')
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNext(params.get('next') || '/')
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -23,14 +29,14 @@ export default function LoginPage() {
       setError('Email ou senha incorretos.')
       setLoading(false)
     } else {
-      router.push('/')
+      router.push(next)
     }
   }
 
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}${next}` },
     })
   }
 
@@ -88,7 +94,8 @@ export default function LoginPage() {
 
         <p className="text-center text-sm" style={{ color: '#666' }}>
           Não tem conta?{' '}
-          <Link href="/register" className="font-semibold" style={{ color: '#FF8C00' }}>
+          <Link href={`/register${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="font-semibold" style={{ color: '#FF8C00' }}>
             Criar conta
           </Link>
         </p>

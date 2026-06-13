@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -13,8 +13,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [next, setNext] = useState('/')
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNext(params.get('next') || '/')
+  }, [])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -63,7 +69,8 @@ export default function RegisterPage() {
           Enviamos um link de confirmação para <strong className="text-white">{email}</strong>.<br/>
           Clique no link e depois faça login.
         </p>
-        <Link href="/login" className="btn-primary mt-4" style={{ width: 'auto', padding: '12px 28px' }}>
+        <Link href={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
+          className="btn-primary mt-4" style={{ width: 'auto', padding: '12px 28px' }}>
           Ir para o login
         </Link>
       </div>
@@ -124,7 +131,8 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm mt-2" style={{ color: '#666' }}>
           Já tem conta?{' '}
-          <Link href="/login" className="font-semibold" style={{ color: '#FF8C00' }}>
+          <Link href={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="font-semibold" style={{ color: '#FF8C00' }}>
             Entrar
           </Link>
         </p>
