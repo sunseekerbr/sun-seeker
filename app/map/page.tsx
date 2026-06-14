@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase'
-import type { Location } from '@/lib/supabase'
+import type { Post } from '@/lib/supabase'
 import BottomNav from '@/components/BottomNav'
 
-// Importação dinâmica sem SSR — obrigatório pro Leaflet funcionar no Next.js
 const MapLeaflet = dynamic(() => import('@/components/MapLeaflet'), {
   ssr: false,
   loading: () => (
@@ -18,30 +17,29 @@ const MapLeaflet = dynamic(() => import('@/components/MapLeaflet'), {
 })
 
 export default function MapPage() {
-  const [locations, setLocations] = useState<Location[]>([])
-  const [selected, setSelected] = useState<Location | null>(null)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [selected, setSelected] = useState<Post | null>(null)
   const [filter, setFilter] = useState('todos')
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
-    async function loadLocations() {
+    async function load() {
+      // Busca posts que têm coordenadas geográficas
       const { data } = await supabase
-        .from('locations')
-        .select('*')
+        .from('posts')
+        .select('*, profiles(username, avatar_url)')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
         .order('avg_rating', { ascending: false })
-        .limit(100)
-      setLocations(data ?? [])
+        .limit(200)
+      setPosts(data ?? [])
       setLoading(false)
     }
-    loadLocations()
+    load()
   }, [])
 
   const filters = ['todos', 'praia', 'montanha', 'cidade', 'campo']
-
-  const filtered = filter === 'todos'
-    ? locations
-    : locations.filter(l => l.type?.toLowerCase() === filter)
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
@@ -72,86 +70,79 @@ export default function MapPage() {
       </div>
 
       {/* Mapa */}
-      <div className="relative" style={{ height: '42vh', zIndex: 10 }}>
+      <div className="relative" style={{ height: '45vh', zIndex: 10 }}>
         {loading ? (
           <div className="w-full h-full flex items-center justify-center" style={{ background: '#0d1117' }}>
             <div className="w-7 h-7 rounded-full border-2 animate-spin"
               style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
           </div>
+        ) : posts.length === 0 ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3"
+            style={{ background: '#0d1117' }}>
+            <div className="text-4xl">🗺️</div>
+            <p className="text-sm font-semibold text-white">Nenhum pôr do sol no mapa ainda</p>
+            <p className="text-xs text-center px-8" style={{ color: '#555' }}>
+              Poste fotos com localização para aparecerem aqui
+            </p>
+          </div>
         ) : (
-          <MapLeaflet locations={filtered} onSelect={setSelected} />
+          <MapLeaflet posts={posts} />
         )}
       </div>
 
-      {/* Card do local selecionado */}
+      {/* Card do post selecionado (reservado para futuro click na lista) */}
       {selected && (
         <div className="mx-4 mt-3 p-4 rounded-2xl flex items-center gap-3"
           style={{ background: '#1a1a28', border: '1px solid #FF8C00' }}>
           <div className="flex-1">
-            <p className="text-sm font-bold text-white">{selected.name}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#888' }}>
-              {selected.city}{selected.state ? `, ${selected.state}` : ''}
-            </p>
-            <div className="flex gap-2 mt-2">
-              {selected.avg_rating > 0 && (
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,140,0,0.15)', color: '#FF8C00' }}>
-                  ★ {Number(selected.avg_rating).toFixed(1)}
-                </span>
-              )}
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(255,77,109,0.15)', color: '#FF4D6D' }}>
-                {selected.photo_count} fotos
+            <p className="text-sm font-bold text-white">{selected.location_name ?? 'Sem nome'}</p>
+            <p className="text-xs mt-0.5" style={{ color: '#888' }}>@{selected.profiles?.username}</p>
+            {selected.avg_rating > 0 && (
+              <span className="text-xs font-bold mt-1 inline-block"
+                style={{ color: '#FF8C00' }}>
+                ★ {Number(selected.avg_rating).toFixed(1)}
               </span>
-            </div>
+            )}
           </div>
           <button onClick={() => setSelected(null)} style={{ color: '#555', fontSize: 18 }}>✕</button>
         </div>
       )}
 
-      {/* Lista de locais */}
+      {/* Lista de posts com localização */}
       <div className="px-4 mt-4 pb-28 flex-1">
         <p className="text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: '#555' }}>
-          Melhores avaliados
+          {posts.length > 0 ? `${posts.length} pôres do sol no mapa` : 'Nenhum local ainda'}
         </p>
 
-        {!loading && filtered.length === 0 && (
-          <div className="text-center py-12" style={{ color: '#555' }}>
-            <div className="text-4xl mb-3">📍</div>
-            <p className="text-sm">Nenhum local cadastrado ainda.</p>
-            <p className="text-xs mt-1">Poste um pôr do sol com localização!</p>
-          </div>
-        )}
-
-        {filtered.map((loc) => (
-          <div key={loc.id}
-            onClick={() => setSelected(loc)}
-            className="flex items-center gap-3 p-3 mb-2 rounded-2xl cursor-pointer transition-all active:scale-[0.98]"
-            style={{ background: '#1a1a28', border: `1px solid ${selected?.id === loc.id ? '#FF8C00' : '#2a2a3a'}` }}>
-            <div className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl"
-              style={{ background: 'linear-gradient(135deg, #c44d32, #f5a623)' }}>
-              🌅
+        {posts.map((post) => (
+          <a key={post.id} href={`/post/${post.id}`}
+            className="flex items-center gap-3 p-3 mb-2 rounded-2xl transition-all active:scale-[0.98]"
+            style={{ background: '#1a1a28', border: '1px solid #2a2a3a', textDecoration: 'none' }}>
+            <div className="w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden">
+              <img src={post.image_url} alt="" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{loc.name}</p>
+              <p className="text-sm font-semibold text-white truncate">
+                {post.location_name ?? 'Local não informado'}
+              </p>
               <p className="text-xs mt-0.5 truncate" style={{ color: '#888' }}>
-                {loc.city}{loc.state ? `, ${loc.state}` : ''}
+                @{post.profiles?.username}
               </p>
               <div className="flex gap-2 mt-1.5">
-                {loc.avg_rating > 0 && (
+                {post.avg_rating > 0 && (
                   <span className="text-xs font-bold" style={{ color: '#FF8C00' }}>
-                    ★ {Number(loc.avg_rating).toFixed(1)}
+                    ★ {Number(post.avg_rating).toFixed(1)}
                   </span>
                 )}
                 <span className="text-xs" style={{ color: '#555' }}>
-                  {loc.photo_count} fotos
+                  {post.likes_count} ❤️
                 </span>
               </div>
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2">
               <path d="M9 18l6-6-6-6"/>
             </svg>
-          </div>
+          </a>
         ))}
       </div>
 

@@ -4,14 +4,11 @@ import { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Location } from '@/lib/supabase'
-import Link from 'next/link'
+import type { Post } from '@/lib/supabase'
 
-// Fix Leaflet default icon bug with webpack
 function FixLeafletIcons() {
-  const map = useMap()
+  useMap()
   useEffect(() => {
-    // Supress the missing icon warning
     delete (L.Icon.Default.prototype as any)._getIconUrl
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -44,17 +41,17 @@ function createSunsetPin(rating: number) {
 }
 
 type Props = {
-  locations: Location[]
-  onSelect: (loc: Location) => void
+  posts: Post[]
 }
 
-export default function MapLeaflet({ locations, onSelect }: Props) {
-  // Centro do Brasil como default; se tiver locations, centra na primeira
-  const center: [number, number] = locations.length > 0 && locations[0].lat && locations[0].lng
-    ? [locations[0].lat, locations[0].lng]
+export default function MapLeaflet({ posts }: Props) {
+  const postsWithCoords = posts.filter(p => p.lat && p.lng)
+
+  const center: [number, number] = postsWithCoords.length > 0
+    ? [postsWithCoords[0].lat!, postsWithCoords[0].lng!]
     : [-15.7801, -47.9292]
 
-  const zoom = locations.length > 0 ? 5 : 4
+  const zoom = postsWithCoords.length > 0 ? 8 : 4
 
   return (
     <MapContainer
@@ -68,34 +65,44 @@ export default function MapLeaflet({ locations, onSelect }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {locations.map(loc => (
-        loc.lat && loc.lng ? (
-          <Marker
-            key={loc.id}
-            position={[loc.lat, loc.lng]}
-            icon={createSunsetPin(loc.avg_rating)}
-            eventHandlers={{ click: () => onSelect(loc) }}
-          >
-            <Popup>
-              <div style={{ minWidth: 160, fontFamily: 'sans-serif' }}>
-                <p style={{ fontWeight: 700, fontSize: 13, margin: '0 0 4px' }}>{loc.name}</p>
-                <p style={{ color: '#888', fontSize: 11, margin: '0 0 6px' }}>
-                  {loc.city}{loc.state ? `, ${loc.state}` : ''}
+      {postsWithCoords.map(post => (
+        <Marker
+          key={post.id}
+          position={[post.lat!, post.lng!]}
+          icon={createSunsetPin(post.avg_rating)}
+        >
+          <Popup>
+            <div style={{ minWidth: 160, fontFamily: 'sans-serif', padding: '2px 0' }}>
+              {/* Thumbnail */}
+              <a href={`/post/${post.id}`} style={{ display: 'block', marginBottom: 8 }}>
+                <img
+                  src={post.image_url}
+                  alt=""
+                  style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 8 }}
+                />
+              </a>
+              {post.location_name && (
+                <p style={{ fontWeight: 700, fontSize: 12, margin: '0 0 3px', color: '#111' }}>
+                  📍 {post.location_name}
                 </p>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {loc.avg_rating > 0 && (
-                    <span style={{ background: '#FF8C00', color: '#fff', padding: '2px 7px', borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
-                      ★ {Number(loc.avg_rating).toFixed(1)}
-                    </span>
-                  )}
-                  <span style={{ background: '#1e1e2e', color: '#aaa', padding: '2px 7px', borderRadius: 8, fontSize: 11 }}>
-                    {loc.photo_count} fotos
+              )}
+              <p style={{ color: '#888', fontSize: 11, margin: '0 0 6px' }}>
+                @{post.profiles?.username}
+              </p>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {post.avg_rating > 0 && (
+                  <span style={{ background: '#FF8C00', color: '#fff', padding: '2px 7px', borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
+                    ★ {Number(post.avg_rating).toFixed(1)}
                   </span>
-                </div>
+                )}
+                <a href={`/post/${post.id}`}
+                  style={{ color: '#FF8C00', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>
+                  Ver post →
+                </a>
               </div>
-            </Popup>
-          </Marker>
-        ) : null
+            </div>
+          </Popup>
+        </Marker>
       ))}
     </MapContainer>
   )
