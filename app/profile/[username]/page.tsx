@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -16,7 +16,9 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const avatarRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -64,6 +66,19 @@ export default function ProfilePage() {
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser) return
+    setAvatarUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `avatars/${currentUser}.${ext}`
+    await supabase.storage.from('sunset-photos').upload(path, file, { upsert: true })
+    const { data: { publicUrl } } = supabase.storage.from('sunset-photos').getPublicUrl(path)
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUser)
+    setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null)
+    setAvatarUploading(false)
   }
 
   async function handleFollow() {
@@ -133,15 +148,34 @@ export default function ProfilePage() {
 
         {/* Avatar */}
         <div className="absolute -bottom-9 left-1/2 -translate-x-1/2">
-          <div className="story-ring p-0.5" style={{ display: 'inline-block', borderRadius: '50%' }}>
-            <div className="w-20 h-20 rounded-full overflow-hidden"
-              style={{ background: '#1e1e2e', border: '3px solid #0a0a0f' }}>
-              {profile.avatar_url ? (
+          <div className="story-ring p-0.5 relative" style={{ display: 'inline-block', borderRadius: '50%' }}>
+            <div
+              className="w-20 h-20 rounded-full overflow-hidden"
+              style={{ background: '#1e1e2e', border: '3px solid #0a0a0f', cursor: isOwn ? 'pointer' : 'default' }}
+              onClick={() => isOwn && avatarRef.current?.click()}>
+              {avatarUploading ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full border-2 animate-spin"
+                    style={{ borderColor: '#2a2a3a', borderTopColor: '#FF8C00' }} />
+                </div>
+              ) : profile.avatar_url ? (
                 <Image src={profile.avatar_url} alt="" width={80} height={80} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-3xl">🌅</div>
               )}
             </div>
+            {isOwn && (
+              <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ background: '#FF8C00', border: '2px solid #0a0a0f' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              </div>
+            )}
+            {isOwn && (
+              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            )}
           </div>
         </div>
       </div>
@@ -199,7 +233,7 @@ export default function ProfilePage() {
       ) : (
         <div className="grid grid-cols-2 gap-0.5">
           {posts.map((post) => (
-            <div key={post.id} className="relative" style={{ aspectRatio: '1' }}>
+            <Link key={post.id} href={`/post/${post.id}`} className="relative block" style={{ aspectRatio: '1' }}>
               <Image
                 src={post.image_url}
                 alt={post.caption ?? ''}
@@ -211,7 +245,7 @@ export default function ProfilePage() {
                 style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
                 {post.avg_rating > 0 ? `★ ${Number(post.avg_rating).toFixed(1)}` : ''}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
